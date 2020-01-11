@@ -500,8 +500,8 @@ namespace UnrealBuildTool
 				{
 					// If you have XboxOne source access, uncommenting the line below will be better for selecting the appropriate version of the compiler.
 					// Translate the XboxOne compiler to the right Windows compiler to set the VC environment vars correctly...
-					WindowsCompiler windowsCompiler = XboxOnePlatform.GetDefaultCompiler() == XboxOneCompiler.VisualStudio2015 ? WindowsCompiler.VisualStudio2015 : WindowsCompiler.VisualStudio2017;
-					VCEnv = VCEnvironment.Create(windowsCompiler, CppPlatform.Win64, null, null);
+					//WindowsCompiler windowsCompiler = XboxOnePlatform.GetDefaultCompiler() == XboxOneCompiler.VisualStudio2015 ? WindowsCompiler.VisualStudio2015 : WindowsCompiler.VisualStudio2017;
+					//VCEnv = VCEnvironment.Create(windowsCompiler, CppPlatform.Win64, null, null);
 				}
 			}
 			catch (Exception)
@@ -563,8 +563,6 @@ namespace UnrealBuildTool
 
 				VCToolPath64 = VCEnvironment.GetVCToolPath64(WindowsPlatform.GetDefaultCompiler(null), VCEnv.ToolChainDir).ToString();
 
-				string debugVCToolPath64 = VCEnv.CompilerPath.Directory.ToString();
-
 				AddText(string.Format(".WindowsSDKBasePath = '{0}'\n", VCEnv.WindowsSdkDir));
 
 				AddText("Compiler('UE4ResourceCompiler') \n{\n");
@@ -597,6 +595,8 @@ namespace UnrealBuildTool
 				}
 				AddText("\t\t'$Root$/mspdbsrv.exe'\n");
 				AddText("\t\t'$Root$/mspdbcore.dll'\n");
+				if (File.Exists(string.Format("{0}/tbbmalloc.dll", VCEnv.CompilerPath.Directory)))
+					AddText("\t\t'$Root$/tbbmalloc.dll'\n");
 
 				AddText(string.Format("\t\t'$Root$/mspft{0}.dll'\n", platformVersionNumber));
 				AddText(string.Format("\t\t'$Root$/msobj{0}.dll'\n", platformVersionNumber));
@@ -609,10 +609,9 @@ namespace UnrealBuildTool
 				}
 				else
 				{
-					//VS 2017 is really confusing in terms of version numbers and paths so these values might need to be modified depending on what version of the tool chain you
-					// chose to install.
-					AddText(string.Format("\t\t'{0}/VC/Redist/MSVC/14.13.26020/x64/Microsoft.VC141.CRT/msvcp{1}.dll'\n", VCInstallDir.ToString(), platformVersionNumber));
-					AddText(string.Format("\t\t'{0}/VC/Redist/MSVC/14.13.26020/x64/Microsoft.VC141.CRT/vccorlib{1}.dll'\n", VCInstallDir.ToString(), platformVersionNumber));
+					AddText(string.Format("\t\t'{0}/msvcp{1}.dll'\n", VCToolPath64, platformVersionNumber));
+					if (File.Exists(string.Format("{0}/vccorlib{1}.dll", VCToolPath64, platformVersionNumber))) // no vccorlibXXX.dll in newer versions of VS anymore
+						AddText(string.Format("\t\t'{0}/vccorlib{1}.dll'\n", VCToolPath64, platformVersionNumber));
 				}
 
 				AddText("\t}\n"); //End extra files
@@ -642,7 +641,6 @@ namespace UnrealBuildTool
 			AddText("\t.Environment = \n\t{\n");
 			if (VCEnv != null)
 			{
-				AddText(string.Format("\t\t\"PATH={0}\\Common7\\IDE\\;{1}\",\n", VCInstallDir.ToString(), VCToolPath64));
 				if (VCEnv.IncludePaths.Count() > 0)
 				{
 					AddText(string.Format("\t\t\"INCLUDE={0}\",\n", String.Join(";", VCEnv.IncludePaths.Select(x => x))));
@@ -728,6 +726,7 @@ namespace UnrealBuildTool
 			}
 
 			string OtherCompilerOptions = GetOptionValue(ParsedCompilerOptions, "OtherOptions", Action);
+			OtherCompilerOptions = OtherCompilerOptions.Replace("we4668", "wd4668"); // see https://github.com/liamkf/Unreal_FASTBuild/issues/29#issuecomment-478950966
 			string CompilerOutputExtension = ".unset";
 
 			if (ParsedCompilerOptions.ContainsKey("/Yc")) //Create PCH
